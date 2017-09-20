@@ -2,6 +2,12 @@ import snake as game
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Convolution2D, Permute
 from keras.optimizers import SGD , Adam
+import numpy as np
+import skimage as skimage
+from skimage import transform, color, exposure
+from skimage.transform import rotate
+from skimage.viewer import ImageViewer
+from collections import deque
 #Shape of the image imported into the NN
 input_shape=(84,84,3)
 #nb_actions is the number of actions the player can do in the game
@@ -30,3 +36,24 @@ adam=Adam(lr=learning_rate)
 model.compile(loss='mean_squared_error',
             optimizer=adam)
 print(model.summary())
+
+def remake_image(image):
+
+    #Make image black and white
+    image = skimage.color.rgb2gray(image)
+    #Resize the image to 80x80 pixels
+    image = skimage.transform.resize(image,(80,80))
+    #Change the intensity of colors, maximizing the intensities.
+    image = skimage.exposure.rescale_intensity(image,out_range=(0,255))
+
+    return image
+#Here is where we train the model. First we need to grab someting to train on
+game_state = game.Game()
+game_state.set_start_state()
+
+#Store state of the game
+d = deque()
+#get the image of the game
+game_image = game_state.run(0)
+
+game_image = remake_image(game_image)

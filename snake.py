@@ -2,12 +2,12 @@ import sys, pygame, random, itertools, time
 
 class Game(object):
 
-    def __init__(self, screen):
+    def __init__(self):
         self.screen = pygame.display.set_mode((250, 250))
 
-        self.scr_width = screen.get_rect().width
-        self.scr_height = screen.get_rect().height
-        self.size = screen.get_size()
+        self.scr_width = self.screen.get_rect().width
+        self.scr_height = self.screen.get_rect().height
+        self.size = self.screen.get_size()
         self.grid_square = 10
         self.keys_pressed = []
         self.set_start_state()
@@ -32,7 +32,9 @@ class Game(object):
 
         self.draw()
         time.sleep(80.0/1000.0)
+        image = pygame.surfarray.array3d(pygame.display.get_surface())
 
+        return image
     def update(self,actions):
         food_collision = self.food.position == self.snake.positions[0]
         if food_collision:
