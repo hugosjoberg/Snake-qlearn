@@ -1,146 +1,109 @@
-import sys, pygame, random, itertools, time
+import pygame, random, sys, time
+from pygame.locals import *
 
 class Game(object):
 
-    def __init__(self):
-        self.screen = pygame.display.set_mode((250, 250))
+	def __init__(self):
+		pygame.init()
+		self.s = pygame.display.set_mode((600, 600))
+		pygame.display.set_caption('Snake')
+		self.f = pygame.font.SysFont('Arial', 20)
 
-        self.scr_width = self.screen.get_rect().width
-        self.scr_height = self.screen.get_rect().height
-        self.size = self.screen.get_size()
-        self.grid_square = 10
-        self.keys_pressed = []
-        self.set_start_state()
-        self.score = 0
+		self.set_start_state()
 
-    def set_start_state(self):
-        width, height = self.size
-        self.screen_center = [width / 2, height / 2]
-        self.snake = Snake(self.screen_center)
-        self.food = Food(self.new_food_position())
+	def set_start_state(self):
+		self.xs = [290, 290]
+		self.ys = [290, 270]
+		self.dirs = 4
+		self.score = 0
+		self.applepos = (random.randint(0, 590), random.randint(0, 590))
+		self.appleimage = pygame.Surface((10, 10))
+		self.appleimage.fill((0, 255, 0))
+		self.img = pygame.Surface((20, 20))
+		self.img.fill((255, 0, 0))
+		self.game_over = False
 
-    def run(self,actions):
+	def collide(self,x1, x2, y1, y2, w1, w2, h1, h2):
+		if x1+w1>x2 and x1<x2+w2 and y1+h1>y2 and y1<y2+h2:
+			return True
+		else:
+			return False
 
-        pygame.event.pump()
-        #self.keys_pressed = pygame.key.get_pressed()
-        self.update(actions)
-        if self.snake_out_of_bounds() or self.snake.self_collision():
-            print('The game ended')
-            print('The score was: ',self.score)
-            pygame.QUIT
-            sys.exit(1)
+	def die(self):
 
-        self.draw()
-        time.sleep(80.0/1000.0)
-        image = pygame.surfarray.array3d(pygame.display.get_surface())
+		self.f=pygame.font.SysFont('Arial', 30)
+		self.t=self.f.render('Your score was: '+str(self.score), True, (0, 0, 0))
+		self.s.blit(self.t, (10, 270))
+		pygame.display.update()
+		self.game_over = True
+		self.score = -1
+		image = pygame.surfarray.array3d(pygame.display.get_surface())
+		final_score = self.score
+		game_over_flag = self.game_over
+		time.sleep(0.5)
+		self.__init__()
+		return image, final_score, game_over_flag
 
-        return image
-    def update(self,actions):
-        food_collision = self.food.position == self.snake.positions[0]
-        if food_collision:
-            self.score+=1
-            self.food.position = self.new_food_position()
-            print(self.score)
-        self.snake.update(self.get_direction(actions), food_collision)
+	def direction_snake(self,actions):
+		action = actions
+		if action == 2 and self.dirs != 0:
+			self.dirs = 2
+		elif action == 0 and self.dirs != 2:
+			self.dirs = 0
+		elif action == 3 and self.dirs != 1:
+			self.dirs = 3
+		elif action == 1 and self.dirs != 3:
+			self.dirs = 1
+		dirs = self.dirs
+		self.move_snake(dirs)
 
-    def get_direction(self,action):
-
-        if action==0:
-            return [-self.grid_square, 0]
-        elif action==1:
-            return [self.grid_square, 0]
-        elif action==2:
-            return [0, -self.grid_square]
-        elif action==3:
-            return [0, self.grid_square]
-        else:
-            return [0, 0]
-
-    def new_food_position(self):
-        x = self.random_valid_coordinate(0)
-        y = self.random_valid_coordinate(1)
-        for position in self.snake.positions:
-            if [x, y] == position:
-                return self.new_food_position()
-        return [x, y]
-
-    def random_valid_coordinate(self, axis):
-        num_squares = self.size[axis] / self.grid_square - 1
-        return random.randint(0, num_squares) * self.grid_square
-
-    def snake_out_of_bounds(self):
-        head_posx, head_posy = self.snake.positions[0]
-        return head_posx < 0 or head_posx > self.size[0] - self.grid_square or\
-               head_posy < 0 or head_posy > self.size[1] - self.grid_square
-
-    def draw(self):
-        self.screen.fill((0,0,0))
-        self.food.draw(self.screen)
-        self.snake.draw(self.screen)
-        pygame.display.flip()
-
-class Snake(object):
-    def __init__(self, position, speed=[0,0]):
-        self.positions = [position]
-        self.speed = speed
-
-    def update(self, speed_delta, food_collision=False):
-        self.set_speed(speed_delta)
-        head_pos = self.new_head_position()
-
-        self.positions.insert(0, head_pos)
-        if not food_collision:
-            self.positions.pop()
-
-    def new_head_position(self):
-        current_head = self.positions[0]
-        return [current_head[0] + self.speed[0],
-                current_head[1] + self.speed[1]]
-
-    def set_speed(self, speed_delta):
-        if speed_delta == [0, 0]:
-            pass
-        elif self.speed == [0, 0]:
-            self.speed = speed_delta
-        # change speed only if speed_delta is orthogonal to speed
-        elif abs(self.speed[0]) != abs(speed_delta[0]):
-            self.speed = speed_delta
-
-    def self_collision(self):
-        head_pos = self.positions[0]
-        for position in self.positions[1:]:
-            if position == head_pos:
-                return True
-        return False
-
-    def draw(self, screen):
-        square = pygame.Surface((10, 10))
-        square.fill((0, 255, 0))
-        for position in self.positions:
-            screen.blit(square, position)
-
-class Food(object):
-    def __init__(self, position):
-        self.square = pygame.Surface((10, 10))
-        self.position = position
-
-    def draw(self,screen):
-        self.square.fill((0, 0, 255))
-        screen.blit(self.square,self.position)
-'''
-def runner():
-    screen = pygame.display.set_mode((210, 160))
-
-    game = Game(screen)
-
-    while True:
-
-        game.run()
-        #game.set_start_state()
+	def move_snake(self,dirs):
+		if dirs==0:
+			self.ys[0] += 20
+		elif dirs==1:
+			self.xs[0] += 20
+		elif dirs==2:
+			self.ys[0] -= 20
+		elif dirs==3:
+			self.xs[0] -= 20
 
 
+	def run(self,actions):
+		actions = actions
+		pygame.event.pump()
+		self.direction_snake(actions)
 
-if __name__ == "__main__":
-    pygame.init()
-    runner()
-'''
+		i = len(self.xs)-1
+		while i >= 2:
+			if self.collide(self.xs[0], self.xs[i], self.ys[0], self.ys[i], 20, 20, 20, 20):
+				self.die()
+			i-= 1
+
+		if self.collide(self.xs[0], self.applepos[0], self.ys[0], self.applepos[1], 20, 10, 20, 10):
+			self.score += 1
+			self.xs.append(700)
+			self.ys.append(700)
+			self.applepos = (random.randint(0,590),random.randint(0,590))
+
+		if self.xs[0] < 0 or self.xs[0] > 580 or self.ys[0] < 0 or self.ys[0] > 580:
+			self.die()
+
+		i = len(self.xs)-1
+		while i >= 1:
+			self.xs[i] = self.xs[i-1]
+			self.ys[i] = self.ys[i-1]
+			i -= 1
+
+		self.s.fill((255, 255, 255))
+
+		for i in range(0, len(self.xs)):
+			self.s.blit(self.img, (self.xs[i], self.ys[i]))
+
+		self.s.blit(self.appleimage, self.applepos)
+		self.t=self.f.render(str(self.score), True, (0, 0, 0))
+		self.s.blit(self.t, (10, 10))
+		#pygame.display.update()
+		pygame.display.flip()
+		time.sleep(1/7)
+		image = pygame.surfarray.array3d(pygame.display.get_surface())
+		return image, self.score, self.game_over
