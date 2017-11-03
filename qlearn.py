@@ -10,7 +10,6 @@ from skimage.transform import rotate
 from skimage.viewer import ImageViewer
 from collections import deque
 import random
-import time
 import json
 
 
@@ -84,7 +83,7 @@ def train_network(model,args):
         OBSERVE = OBSERVATION
         epsilon = INITIAL_EPSILON
 
-
+    terminal = False
     t = 0
     while(True):
 
@@ -93,40 +92,33 @@ def train_network(model,args):
         action_index = 4
         r_t = 0
         a_t = 'no nothing'
+        if terminal:
+            game_state.set_start_state()
         if t % NB_FRAMES == 0:
             if random.random() <= epsilon:
                 action_index = random.randrange(NB_ACTIONS)
                 a_t = GAME_INPUT[action_index]
-
             else:
-                q = model.predict(s_t)
-                max_Q = np.argmax(q)
-                action_index = max_Q
+                action_index = np.argmax(model.predict(s_t))
                 a_t = GAME_INPUT[action_index]
 
         #Reduce learning rate over time
         if epsilon > FINAL_EPSILON and t > OBSERVE:
             epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
 
-
         #run the selected action and observed next state and reward
-
         x_t1_colored, r_t, terminal = game_state.run(a_t)
-        #print('This is the action the agent wants: ',a_t)
 
         x_t1 = skimage.color.rgb2gray(x_t1_colored)
         x_t1 = skimage.transform.resize(x_t1,(80,80))
         x_t1 = skimage.exposure.rescale_intensity(x_t1, out_range=(0, 255))
-
         x_t1 = x_t1.reshape(1, x_t1.shape[0], x_t1.shape[1], 1) #1x80x80x1
         s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3)
 
         # store the transition in D
         D.append((s_t, action_index, r_t, s_t1, terminal))
-
         if(len(D) > REPLAY_MEMORY):
             D.popleft()
-
         if(t>OBSERVE):
 
             minibatch = random.sample(D, BATCH)
@@ -146,10 +138,10 @@ def train_network(model,args):
 
                 targets[i] = model.predict(state_t)  # Hitting each buttom probability
                 Q_sa = model.predict(state_t1)
+                #action_index = np.argmax(model.predict(s_t))
 
                 if terminal:
                     targets[i, action_t] = reward_t
-                    print(reward_t)
                 else:
                     targets[i, action_t] = reward_t + GAMMA * np.max(Q_sa)
 
