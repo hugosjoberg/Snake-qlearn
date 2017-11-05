@@ -2,6 +2,7 @@ import snake as game
 import argparse
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Convolution2D, Permute
+from keras.layers.normalization import BatchNormalization
 from keras.optimizers import SGD , Adam
 import numpy as np
 import skimage as skimage
@@ -11,20 +12,21 @@ from skimage.viewer import ImageViewer
 from collections import deque
 import random
 import json
+from random import sample as rsample
+from keras.optimizers import RMSprop
 
-
-INPUT_SHAPE=(80,80,4) #Shape of the image imported into the NN
-NB_ACTIONS = 4 #NB_ACTIONS is the number of actions the player can do in the game
+INPUT_SHAPE=(80,80,2) #Shape of the image imported into the NN
+NB_ACTIONS = 5 #NB_ACTIONS is the number of actions the player can do in the game
 NB_FRAMES = 1 #NB_FRAMES is the number of frames that are presented when an action can be performed
 OBSERVATION = 3200
 REPLAY_MEMORY = 50000
-BATCH = 32
-GAME_INPUT = [0,1,2,3]
+BATCH = 64
+GAME_INPUT = [0,1,2,3,4]
 EXPLORE = 3000000
-INITIAL_EPSILON = 1
+INITIAL_EPSILON = 0.5
 FINAL_EPSILON = 0.0001
 LEARNING_RATE = 1e-4
-GAMMA = 0.99 # decay rate of past observations
+GAMMA = 0.8 # decay rate of past observations
 
 
 #Building a NN model for interpretating the image from the game
@@ -34,32 +36,42 @@ GAMMA = 0.99 # decay rate of past observations
 
 def build_model():
     model = Sequential()
-    model.add(Convolution2D(32, (8, 8), strides=(4, 4),input_shape=INPUT_SHAPE))
+    #model.add(BatchNormalization(axis=1, input_shape=(INPUT_SHAPE)))
+    model.add(Convolution2D(16, (8, 8), strides=(4, 4),input_shape=INPUT_SHAPE))
     model.add(Activation('relu'))
-    model.add(Convolution2D(64, (4, 4), strides=(2, 2)))
+    model.add(Convolution2D(32, (4, 4), strides=(2, 2)))
     model.add(Activation('relu'))
-    model.add(Convolution2D(64, (3, 3), strides=(1, 1)))
-    model.add(Activation('relu'))
+    #model.add(Convolution2D(64, (3, 3), strides=(1, 1)))
+    #model.add(Activation('relu'))
     model.add(Flatten())
-    model.add(Dense(512))
-    model.add(Activation('relu'))
+    model.add(Dense(256))
+    #model.add(Activation('relu'))
     model.add(Dense(NB_ACTIONS))
-    model.add(Activation('linear'))
-
+    #model.add(Activation('linear'))
     #I chosed to use a Adam optimizer, I have used it before with good results
     adam=Adam(lr=LEARNING_RATE)
     model.compile(loss='mean_squared_error',
                     optimizer=adam)
     print(model.summary())
     return model
+    '''
+    # Recipe of deep reinforcement learning model
+    model = Sequential()
+    model.add(Convolution2D(16,(3,3), activation='relu', input_shape=(INPUT_SHAPE)))
+    model.add(Convolution2D(32,(3,3), activation='relu'))
+    model.add(Flatten())
+    model.add(Dense(256, activation='relu'))
+    model.add(Dense(NB_ACTIONS))
+    model.compile(RMSprop(), 'MSE')
+    return model
+    '''
+def experience_replay(batch_size):
+    memory = []
+    while True:
+        experience = yield rsample(memory, batch_size) if batch_size <= len(memory) else None
+        memory.append(experience)
 
-def train_network(model,args):
-
-    game_state = game.Game() #Starting up a game
-    game_state.set_start_state()
-    game_image,score,game_lost = game_state.run(4) #The game is started but no action is performed
-    D = deque()
-
+def stack_image(game_image):
     #Make image black and white
     x_t = skimage.color.rgb2gray(game_image)
     #Resize the image to 80x80 pixels
@@ -67,26 +79,26 @@ def train_network(model,args):
     #Change the intensity of colors, maximizing the intensities.
     x_t = skimage.exposure.rescale_intensity(x_t,out_range=(0,255))
     # Stacking 4 images for the agent to get understanding of speed
-    s_t = np.stack((x_t,x_t,x_t,x_t),axis=2)
+    s_t = np.stack((x_t,x_t),axis=2)
+    #s_t = np.stack((x_t,x_t,x_t,x_t),axis=2)
     # Reshape to make keras like it
+    #s_t = s_t.reshape(1, s_t.shape[0], s_t.shape[1])
     s_t = s_t.reshape(1, s_t.shape[0], s_t.shape[1], s_t.shape[2])
+    return s_t
 
-    if args['mode'] == 'Run':
-        OBSERVE = 999999999    #We keep observe, never train
-        epsilon = FINAL_EPSILON
-        print ("Now we load weight")
-        model.load_weights("model.h5")
-        adam = Adam(lr=LEARNING_RATE)
-        model.compile(loss='mse',optimizer=adam)
-        print ("Weight load successfully")
-    else:                       #We go to training mode
-        OBSERVE = OBSERVATION
-        epsilon = INITIAL_EPSILON
+def train_network(model,args):
 
+    game_state = game.Game() #Starting up a game
+    game_state.set_start_state()
+    game_image,score,game_lost = game_state.run(0) #The game is started but no action is performed
+    s_t = stack_image(game_image)
+    epsilon = INITIAL_EPSILON
     terminal = False
     t = 0
-    while(True):
+    exp_replay = experience_replay(BATCH)
+    exp_replay.__next__()  # Start experience replay coroutine
 
+    while(True):
         loss = 0
         Q_sa = 0
         action_index = 4
@@ -103,53 +115,32 @@ def train_network(model,args):
                 a_t = GAME_INPUT[action_index]
 
         #Reduce learning rate over time
-        if epsilon > FINAL_EPSILON and t > OBSERVE:
+        if epsilon > FINAL_EPSILON:
             epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
 
         #run the selected action and observed next state and reward
         x_t1_colored, r_t, terminal = game_state.run(a_t)
-
-        x_t1 = skimage.color.rgb2gray(x_t1_colored)
-        x_t1 = skimage.transform.resize(x_t1,(80,80))
-        x_t1 = skimage.exposure.rescale_intensity(x_t1, out_range=(0, 255))
-        x_t1 = x_t1.reshape(1, x_t1.shape[0], x_t1.shape[1], 1) #1x80x80x1
-        s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3)
-
-        # store the transition in D
-        D.append((s_t, action_index, r_t, s_t1, terminal))
-        if(len(D) > REPLAY_MEMORY):
-            D.popleft()
-        if(t>OBSERVE):
-
-            minibatch = random.sample(D, BATCH)
-            inputs = np.zeros((BATCH, s_t.shape[1], s_t.shape[2], s_t.shape[3]))   #32, 80, 80, 4
-            targets = np.zeros((inputs.shape[0], NB_ACTIONS))                         #32, 2
-
-            #Now we do the experience replay
-            for i in range(0, len(minibatch)):
-                state_t = minibatch[i][0]
-                action_t = minibatch[i][1]   #This is action index
-                reward_t = minibatch[i][2]
-                state_t1 = minibatch[i][3]
-                terminal = minibatch[i][4]
-                # if terminated, only equals reward
-
-                inputs[i:i + 1] = state_t    #I saved down s_t
-
-                targets[i] = model.predict(state_t)  # Hitting each buttom probability
-                Q_sa = model.predict(state_t1)
-                #action_index = np.argmax(model.predict(s_t))
-
-                if terminal:
-                    targets[i, action_t] = reward_t
-                else:
-                    targets[i, action_t] = reward_t + GAMMA * np.max(Q_sa)
-
-            loss += model.train_on_batch(inputs, targets)
-
+        s_t1 = stack_image(x_t1_colored)
+        experience = (s_t, a_t, r_t, s_t1)
         s_t = s_t1
-        t = t + 1
+        batch = exp_replay.send(experience)
 
+        if batch:
+            inputs = np.zeros((BATCH, s_t.shape[1], s_t.shape[2], s_t.shape[3]))
+            targets = np.zeros((BATCH, NB_ACTIONS))
+            i = 0
+            Q_sa = 0
+            for s,a,r,s_pred in batch:
+                inputs[i:i + 1] = s
+                if r < 0:
+                    targets[i ,a] = r
+                else:
+                    Q_sa = model.predict(s_pred)
+                    targets[i ,a] = r + GAMMA * np.max(Q_sa)
+
+                i += 1
+            loss += model.train_on_batch(inputs,targets)
+        t += 1
         # save progress every 10000 iterations
         if t % 1000 == 0:
             print("Now we save model")
@@ -157,26 +148,40 @@ def train_network(model,args):
             with open("model.json", "w") as outfile:
                 json.dump(model.to_json(), outfile)
 
-        # print info
-        state = ""
-        if t <= OBSERVE:
-            state = "observe"
-        elif t > OBSERVE and t <= OBSERVE + EXPLORE:
-            state = "explore"
-        else:
-            state = "train"
-
         if t % 100 == 0:
 
-            print("TIMESTEP", t, "/ STATE", state, \
+            print("TIMESTEP", t, \
                 "/ EPSILON", LEARNING_RATE, "/ ACTION", action_index, "/ REWARD", r_t, \
                 "/ Q_MAX " , np.max(Q_sa), "/ Loss ", loss)
 
     print("Episode finished!")
     print("************************")
 
+def nn_playGame(model):
+    print ("Now we load weight")
+    model.load_weights("model.h5")
+    adam = Adam(lr=LEARNING_RATE)
+    model.compile(loss='mse',optimizer=adam)
+    print ("Weight load successfully")
+    print ("Let the game begin!")
+    game_state = game.Game() #Starting up a game
+    game_state.set_start_state()
+    game_image,score,game_lost = game_state.run(4) #The game is started but no action is performed
+    s_t = stack_image(game_image)
+    s_t1 = s_t
+    a_t = 4
+    while(game_lost==False):
+        action_index = np.argmax(model.predict(s_t1))
+        a_t = GAME_INPUT[action_index]
+        x_t1_colored, _, terminal = game_state.run(a_t)
+        s_t1 = stack_image(x_t1_colored)
+        game_lost = terminal
+
 def playGame(args):
-        model = build_model()
+    model = build_model()
+    if args['mode'] == "Run":
+        nn_playGame(model)
+    else:
         train_network(model,args)
 
 def main():

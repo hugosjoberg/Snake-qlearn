@@ -1,30 +1,37 @@
-import pygame, random, sys, time, math
+import pygame, random, sys, time, math, random
 from pygame.locals import *
 
 class Game(object):
 
 	def __init__(self):
 		pygame.init()
-		self.height = 200
-		self.width = 200
+		self.height = 400
+		self.width = 400
+		self.border_width = 10
 		self.s = pygame.display.set_mode((self.height, self.width))
-		pygame.display.set_caption('Snake')
-		self.f = pygame.font.SysFont('Arial', 20)
 		self.set_start_state()
+		self.speed = 20
+
+
 
 	def set_start_state(self):
-		self.xs = [self.height/2-10, self.width/2-10]
-		self.ys = [self.height/2-10, self.width/2-20]
-		self.dirs = 4
+		self.snake_size = 20
+		self.food_size = 20
+		self.xs = [self.width/2-self.snake_size, self.width/2-self.snake_size,
+				self.width/2-self.snake_size, self.width/2-self.snake_size]
+		self.ys = [self.height/2-self.snake_size, self.height/2-2*self.snake_size,
+				self.height/2-3*self.snake_size, self.height/2-4*self.snake_size]
+		self.dirs = random.choice([0,1,2,3])
 		self.score = 0
-		self.applepos = (random.randint(0, self.height-20), random.randint(0, self.width-20))
-		self.appleimage = pygame.Surface((20, 20))
+		self.applepos = (random.randint(self.border_width+self.food_size, self.height-self.food_size-self.border_width),
+		 				random.randint(self.border_width+self.food_size, self.width-self.food_size-self.border_width))
+		self.appleimage = pygame.Surface((self.food_size, self.food_size))
 		self.appleimage.fill((0, 255, 0))
-		self.img = pygame.Surface((20, 20))
-		self.img.fill((255, 0, 0))
+		self.img = pygame.Surface((self.food_size,self.food_size))
+		self.img.fill((0, 0, 0))
 		self.game_over = False
-		self.new_distance = 0
-		self.old_distance = 0
+		self.new_distance = self.distance(self.xs[0], self.applepos[0], self.ys[0], self.applepos[1])
+
 
 	def collide(self, x1, x2, y1, y2, w1, w2, h1, h2):
 		if x1+w1>x2 and x1<x2+w2 and y1+h1>y2 and y1<y2+h2:
@@ -40,24 +47,20 @@ class Game(object):
 
 	def reward(self, apple_eaten):
 		if self.new_distance < self.old_distance:
-			self.score += 0.3
+			reward = 0.5
 		else:
-			self.score -= 0.3
+			reward = -0.5
 		if apple_eaten:
-			self.score += 0.7
-
-
+			reward = 1.0
+		return reward
 
 	def die(self):
-		self.f=pygame.font.SysFont('Arial', 30)
-		self.t=self.f.render('Your score was: '+str(self.score), True, (0, 0, 0))
-		self.s.blit(self.t, (10, 270))
-		pygame.display.update()
-		self.score = -1
+
+		reward = -1
+		self.draw_board()
 		image = pygame.surfarray.array3d(pygame.display.get_surface())
 		time.sleep(1/10)
-		final_score = -1 * self.score
-		return image, final_score, True
+		return image, reward, True
 
 	def direction_snake(self,actions):
 		action = actions
@@ -69,19 +72,30 @@ class Game(object):
 			self.dirs = 3
 		elif action == 1 and self.dirs != 3:
 			self.dirs = 1
+
 		dirs = self.dirs
 		self.move_snake(dirs)
 
 	def move_snake(self,dirs):
 		if dirs==0:
-			self.ys[0] += 20
+			self.ys[0] += self.speed
 		elif dirs==1:
-			self.xs[0] += 20
+			self.xs[0] += self.speed
 		elif dirs==2:
-			self.ys[0] -= 20
+			self.ys[0] -= self.speed
 		elif dirs==3:
-			self.xs[0] -= 20
+			self.xs[0] -= self.speed
 
+	def draw_board(self):
+		self.s.fill((255, 255, 255))
+		for i in range(0, len(self.xs)):
+			self.s.blit(self.img, (self.xs[i], self.ys[i]))
+		self.s.blit(self.appleimage, self.applepos)
+		pygame.draw.rect(self.s, (0,0,0), [0,0,self.width,self.border_width])
+		pygame.draw.rect(self.s, (0,0,0), [0,self.height-self.border_width,self.width,self.border_width])
+		pygame.draw.rect(self.s, (0,0,0), [0,0,self.border_width,self.height])
+		pygame.draw.rect(self.s, (0,0,0), [self.width-self.border_width,0,self.border_width, self.height])
+		pygame.display.update()
 
 	def run(self,actions):
 		actions = actions
@@ -90,22 +104,33 @@ class Game(object):
 		self.direction_snake(actions)
 		self.old_distance = self.new_distance
 		self.new_distance = self.distance(self.xs[0], self.applepos[0], self.ys[0], self.applepos[1])
+
 		i = len(self.xs)-1
+
+		#Check if snake collide with self
 		while i >= 2:
-			if self.collide(self.xs[0], self.xs[i], self.ys[0], self.ys[i], 20, 20, 20, 20):
+			if self.collide(self.xs[0], self.xs[i], self.ys[0], self.ys[i], self.snake_size,
+										self.snake_size, self.snake_size, self.snake_size):
 				return self.die()
 
 			i-= 1
 
-		if self.collide(self.xs[0], self.applepos[0], self.ys[0], self.applepos[1], 20, 20, 20, 20):
+		#Check if snake collide with apple
+		if self.collide(self.xs[0], self.applepos[0], self.ys[0], self.applepos[1], self.snake_size,
+													self.food_size, self.snake_size, self.food_size):
 			self.score += 1
 			self.xs.append(700)
 			self.ys.append(700)
-			self.applepos = (random.randint(0, self.height-10), random.randint(0, self.width-10))
+			self.applepos = (random.randint(self.border_width+self.food_size, self.height-self.food_size-self.border_width),
+							random.randint(self.border_width+self.food_size, self.width-self.food_size-self.border_width))
 			snake_eat_apple = True
 
-		if self.xs[0] < 0 or self.xs[0] > self.width-20 or self.ys[0] < 0 or self.ys[0] > self.height-20:
+		#Check if snake collide with wall
+		if self.xs[0] < self.border_width/2 or self.xs[0] > self.width-self.snake_size-self.border_width/2 \
+			or self.ys[0] < self.border_width/2 or self.ys[0] > self.height-self.snake_size-self.border_width/2:
+
 			return self.die()
+		
 
 		i = len(self.xs)-1
 		while i >= 1:
@@ -113,17 +138,8 @@ class Game(object):
 			self.ys[i] = self.ys[i-1]
 			i -= 1
 
-		self.s.fill((255, 255, 255))
-
-		for i in range(0, len(self.xs)):
-			self.s.blit(self.img, (self.xs[i], self.ys[i]))
-
-		self.s.blit(self.appleimage, self.applepos)
-		self.t=self.f.render(str(self.score), True, (0, 0, 0))
-		self.s.blit(self.t, (20, 20))
-		#pygame.display.update()
-		pygame.display.flip()
+		self.draw_board()
 		time.sleep(1/20)
 		image = pygame.surfarray.array3d(pygame.display.get_surface())
 		self.reward(snake_eat_apple)
-		return image, self.score, self.game_over
+		return image, self.reward(snake_eat_apple), self.game_over
