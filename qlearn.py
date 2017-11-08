@@ -86,7 +86,14 @@ def stack_image(game_image):
     s_t = s_t.reshape(1, s_t.shape[0], s_t.shape[1], s_t.shape[2])
     return s_t
 
-def train_network(model,args):
+def nn_loadOld_weights(model):
+    print ("Now we load weight")
+    model.load_weights("model.h5")
+    print ("Weight load successfully")
+    print ("Let the training begin!")
+    train_network(model)
+
+def train_network(model):
 
     game_state = game.Game() #Starting up a game
     game_state.set_start_state()
@@ -160,8 +167,6 @@ def train_network(model,args):
 def nn_playGame(model):
     print ("Now we load weight")
     model.load_weights("model.h5")
-    adam = Adam(lr=LEARNING_RATE)
-    model.compile(loss='mse',optimizer=adam)
     print ("Weight load successfully")
     print ("Let the game begin!")
     game_state = game.Game() #Starting up a game
@@ -181,12 +186,20 @@ def playGame(args):
     model = build_model()
     if args['mode'] == "Run":
         nn_playGame(model)
+    elif args['mode'] == "Re-train":
+        nn_loadOld_weights(model)
+    elif args['mode'] == "Train":
+        train_network(model)
     else:
-        train_network(model,args)
+        print("*** Not valid argument ***")
+        print("Run argument for running game with a trained weights")
+        print("Re-train argument for continue training model")
+        print("Train to train train from scratch")
+        print("*********************************")
 
 def main():
     parser = argparse.ArgumentParser(description='How you would like your program to run')
-    parser.add_argument('-m','--mode',help='Train / Run', required =True)
+    parser.add_argument('-m','--mode',help='Train / Run / Re-train', required =True)
     args = vars(parser.parse_args())
     playGame(args)
 
