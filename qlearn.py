@@ -14,6 +14,7 @@ import random
 import json
 from random import sample as rsample
 from keras.optimizers import RMSprop
+import time
 
 INPUT_SHAPE=(80,80,2) #Shape of the image imported into the NN
 NB_ACTIONS = 5 #NB_ACTIONS is the number of actions the player can do in the game
@@ -175,7 +176,14 @@ def nn_playGame(model):
     s_t = stack_image(game_image)
     s_t1 = s_t
     a_t = 4
-    while(game_lost==False):
+    while(True):
+
+        if game_lost:
+            print("Game lost")
+            time.sleep(2)
+            print("Game is restarting")
+            game_state.set_start_state()
+
         action_index = np.argmax(model.predict(s_t1))
         a_t = GAME_INPUT[action_index]
         x_t1_colored, _, terminal = game_state.run(a_t)
