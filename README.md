@@ -17,3 +17,7 @@ git clone https://github.com/hugocool24/Snake-qlearn.git
 cd Snake-qlearn
 python qlearn.py -m "Run"
 ```
+
+# How to train?
+
+python qlearn.py -m "Train"
