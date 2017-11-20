@@ -19,13 +19,13 @@ import sys
 
 INPUT_SHAPE=(80,80,2) #Shape of the image imported into the NN
 NB_ACTIONS = 5 #NB_ACTIONS is the number of actions the player can do in the game
-BATCH = 1024
+BATCH = 100
 GAME_INPUT = [0,1,2,3,4]
 EPSILON = 0.9
 FINAL_EPSILON = 0.001
 LEARNING_RATE = 1e-4
 GAMMA = 0.7
-
+NB_FRAMES = 1
 #Building a NN model for interpretating the image from the game
 #The architecture is borrowed from https://github.com/matthiasplappert/keras-rl/blob/master/examples/dqn_atari.py
 #First wanted to try the DeepMind Atari model but comments recommended the one below instead
@@ -46,6 +46,12 @@ def build_model():
                     optimizer=adam)
     print(model.summary())
     return model
+
+def experience_replay(batch_size):
+    memory = []
+    while True:
+        experience = yield rsample(memory, batch_size) if batch_size <= len(memory) else None
+        memory.append(experience)
 
 def stack_image(game_image):
     #Make image black and white
@@ -68,14 +74,15 @@ def nn_loadOld_weights(model):
     train_network(model)
 
 def train_network(model):
-
+    epsilon = EPSILON
     game_state = game.Game() #Starting up a game
     game_state.set_start_state()
     game_image,score,game_lost = game_state.run(0) #The game is started but no action is performed
     s_t = stack_image(game_image)
     terminal = False
     t = 0
-    d = []
+    exp_replay = experience_replay(BATCH)
+    exp_replay.__next__()  # Start experience replay coroutine
     nb_epoch = 0
     while(True):
         loss = 0
@@ -86,22 +93,25 @@ def train_network(model):
         if terminal:
             game_state.set_start_state()
         if t % NB_FRAMES == 0:
-            if random.random() <= EPSILON:
+            if random.random() <= epsilon:
                 action_index = random.randrange(NB_ACTIONS)
                 a_t = GAME_INPUT[action_index]
             else:
                 action_index = np.argmax(model.predict(s_t))
                 a_t = GAME_INPUT[action_index]
-
+        if epsilon > FINAL_EPSILON:
+            epsilon -= 1/500
         #run the selected action and observed next state and reward
         x_t1_colored, r_t, terminal = game_state.run(a_t)
         s_t1 = stack_image(x_t1_colored)
-        d.append((s_t, a_t, r_t, s_t1))
-        if len(d)==BATCH:
+        experience = (s_t, a_t, r_t, s_t1)
+        batch = exp_replay.send(experience)
+        s_t1 = stack_image(x_t1_colored)
+        if batch:
             inputs = np.zeros((BATCH, s_t.shape[1], s_t.shape[2], s_t.shape[3]))
             targets = np.zeros((BATCH, NB_ACTIONS))
             i = 0
-            for s,a,r,s_pred in d:
+            for s,a,r,s_pred in batch:
                 inputs[i:i + 1] = s
                 if r < 0:
                     targets[i ,a] = r
@@ -110,10 +120,8 @@ def train_network(model):
                     targets[i ,a] = r + GAMMA * np.max(Q_sa)
                 i+=1
             loss += model.train_on_batch(inputs,targets)
-            d.clear()
             #Exploration vs Exploitation
-            if EPSILON > FINAL_EPSILON:
-                EPSILON -= EPSILON/500
+
         t += 1
         # save progress every 10000 iterations
         if t % 1000 == 0:
