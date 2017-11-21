@@ -12,8 +12,6 @@ class Game(object):
 		self.set_start_state()
 		self.speed = 20
 
-
-
 	def set_start_state(self):
 		self.snake_size = 20
 		self.food_size = 20
@@ -30,8 +28,6 @@ class Game(object):
 		self.img = pygame.Surface((self.food_size,self.food_size))
 		self.img.fill((0, 0, 0))
 		self.game_over = False
-		
-
 
 	def collide(self, x1, x2, y1, y2, w1, w2, h1, h2):
 		if x1+w1>x2 and x1<x2+w2 and y1+h1>y2 and y1<y2+h2:
@@ -62,7 +58,6 @@ class Game(object):
 			self.dirs = 3
 		elif action == 1 and self.dirs != 3:
 			self.dirs = 1
-
 		dirs = self.dirs
 		self.move_snake(dirs)
 
@@ -98,7 +93,6 @@ class Game(object):
 			if self.collide(self.xs[0], self.xs[i], self.ys[0], self.ys[i], self.snake_size,
 										self.snake_size, self.snake_size, self.snake_size):
 				return self.die()
-
 			i-= 1
 
 		#Check if snake collide with apple
@@ -127,5 +121,4 @@ class Game(object):
 		self.draw_board()
 		time.sleep(1/20)
 		image = pygame.surfarray.array3d(pygame.display.get_surface())
-		self.reward(snake_eat_apple)
 		return image, self.reward(snake_eat_apple), self.game_over
