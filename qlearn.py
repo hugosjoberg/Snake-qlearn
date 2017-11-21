@@ -21,8 +21,9 @@ INPUT_SHAPE=(80,80,2) #Shape of the image imported into the NN
 NB_ACTIONS = 5 #NB_ACTIONS is the number of actions the player can do in the game
 BATCH = 100
 GAME_INPUT = [0,1,2,3,4]
-EPSILON = 0.9
-FINAL_EPSILON = 0.001
+EPSILON = 1
+EPSILON_DECAY = 0.99
+FINAL_EPSILON = 0.3
 LEARNING_RATE = 1e-4
 GAMMA = 0.7
 NB_FRAMES = 1
@@ -33,13 +34,18 @@ NB_FRAMES = 1
 
 def build_model():
     model = Sequential()
-
-    model.add(Convolution2D(16, (8, 8), strides=(4, 4),input_shape=INPUT_SHAPE))
+    model.add(BatchNormalization(axis=1, input_shape=INPUT_SHAPE))
+    model.add(Convolution2D(32, (2, 2), strides=(2, 2)))
     model.add(Activation('relu'))
-    model.add(Convolution2D(32, (4, 4), strides=(2, 2)))
+    model.add(BatchNormalization(axis=1))
+    model.add(Convolution2D(64, (2, 2), strides=(2, 2)))
+    model.add(Activation('relu'))
+    model.add(BatchNormalization(axis=1))
+    model.add(Convolution2D(64, (3, 3), strides=(2, 2)))
     model.add(Activation('relu'))
     model.add(Flatten())
-    model.add(Dense(256))
+    model.add(Dense(512))
+    model.add(Activation('relu'))
     model.add(Dense(NB_ACTIONS))
     adam=Adam(lr=LEARNING_RATE)
     model.compile(loss='mean_squared_error',
@@ -83,7 +89,6 @@ def train_network(model):
     t = 0
     exp_replay = experience_replay(BATCH)
     exp_replay.__next__()  # Start experience replay coroutine
-    nb_epoch = 0
     while(True):
         loss = 0
         Q_sa = 0
@@ -100,7 +105,9 @@ def train_network(model):
                 action_index = np.argmax(model.predict(s_t))
                 a_t = GAME_INPUT[action_index]
         if epsilon > FINAL_EPSILON:
-            epsilon -= 1/500
+            epsilon = epsilon * EPSILON_DECAY
+        else:
+            epsilon = FINAL_EPSILON
         #run the selected action and observed next state and reward
         x_t1_colored, r_t, terminal = game_state.run(a_t)
         s_t1 = stack_image(x_t1_colored)
