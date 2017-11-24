@@ -34,19 +34,16 @@ NB_FRAMES = 1
 
 def build_model():
     model = Sequential()
-    model.add(BatchNormalization(axis=1, input_shape=INPUT_SHAPE))
-    model.add(Convolution2D(32, (2, 2), strides=(2, 2)))
+
+    model.add(Convolution2D(16, (8, 8), strides=(4, 4),input_shape=INPUT_SHAPE))
     model.add(Activation('relu'))
-    model.add(BatchNormalization(axis=1))
-    model.add(Convolution2D(64, (2, 2), strides=(2, 2)))
-    model.add(Activation('relu'))
-    model.add(BatchNormalization(axis=1))
-    model.add(Convolution2D(64, (3, 3), strides=(2, 2)))
+    model.add(Convolution2D(32, (4, 4), strides=(2, 2)))
     model.add(Activation('relu'))
     model.add(Flatten())
-    model.add(Dense(512))
-    model.add(Activation('relu'))
+    model.add(Dense(256))
     model.add(Dense(NB_ACTIONS))
+
+    #I chosed to use a Adam optimizer, I have used it before with good results
     adam=Adam(lr=LEARNING_RATE)
     model.compile(loss='mean_squared_error',
                     optimizer=adam)
