@@ -9,8 +9,8 @@ class Game(object):
 		self.width = 400
 		self.border_width = 10
 		self.s = pygame.display.set_mode((self.height, self.width))
-		self.set_start_state()
 		self.speed = 20
+		self.set_start_state()
 
 	def set_start_state(self):
 		self.snake_size = 20
@@ -28,6 +28,15 @@ class Game(object):
 		self.img = pygame.Surface((self.food_size,self.food_size))
 		self.img.fill((0, 0, 0))
 		self.game_over = False
+		self.new_distance = 0
+		self.old_distance = 0
+
+
+	def distance(self, x1, x2, y1, y2):
+		x = math.pow((x1-x2),2)
+		y = math.pow((y1-y2),2)
+		distance = math.sqrt(x+y)
+		return distance
 
 	def collide(self, x1, x2, y1, y2, w1, w2, h1, h2):
 		if x1+w1>x2 and x1<x2+w2 and y1+h1>y2 and y1<y2+h2:
@@ -36,7 +45,10 @@ class Game(object):
 			return False
 
 	def reward(self, apple_eaten):
-		reward = 0
+		if self.new_distance<self.old_distance:
+			reward = 0.4
+		else:
+			reward = -0.4
 		if apple_eaten:
 			reward = 1.0
 		return reward
@@ -84,9 +96,14 @@ class Game(object):
 
 	def run(self,actions):
 		actions = actions
+		i = len(self.xs)-1
 		pygame.event.pump()
 		snake_eat_apple = False
 		self.direction_snake(actions)
+		while i >= 1:
+			self.xs[i] = self.xs[i-1]
+			self.ys[i] = self.ys[i-1]
+			i -= 1
 		i = len(self.xs)-1
 		#Check if snake collide with self
 		while i >= 2:
@@ -108,16 +125,11 @@ class Game(object):
 		#Check if snake collide with wall
 		if self.xs[0] < self.border_width/2 or self.xs[0] > self.width-self.snake_size-self.border_width/2 \
 			or self.ys[0] < self.border_width/2 or self.ys[0] > self.height-self.snake_size-self.border_width/2:
-
 			return self.die()
 
-
-		i = len(self.xs)-1
-		while i >= 1:
-			self.xs[i] = self.xs[i-1]
-			self.ys[i] = self.ys[i-1]
-			i -= 1
-
+		#Calculate new distance between snake head and food
+		self.old_distance = self.new_distance
+		self.new_distance = self.distance(self.xs[0], self.applepos[0], self.ys[0], self.applepos[1])
 		self.draw_board()
 		time.sleep(1/20)
 		image = pygame.surfarray.array3d(pygame.display.get_surface())

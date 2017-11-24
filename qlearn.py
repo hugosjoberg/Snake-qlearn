@@ -140,7 +140,7 @@ def train_network(model):
         if t % 500 == 0:
 
             print("TIMESTEP", t, \
-                "/ EPSILON", EPSILON, "/ ACTION", action_index, "/ REWARD", r_t, \
+                "/ EPSILON", epsilon, "/ ACTION", action_index, "/ REWARD", r_t, \
                 "/ Q_MAX " , np.max(Q_sa), "/ Loss ", loss)
 
     print("Episode finished!")
