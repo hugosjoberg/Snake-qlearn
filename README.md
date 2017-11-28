@@ -2,6 +2,10 @@
 
 A implementation of the classic snake game and a neural networking using the q-learning algorithm to solve the game.
 
+Here is a walkthrough of how I did,
+
+https://hugocool24.github.io/walkthrough/2017/11/19/snake-q-learn.html
+
 # Installation Dependencies:
 
 * Python 3.6
