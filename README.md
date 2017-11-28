@@ -6,14 +6,14 @@ Here is a walkthrough of how I did,
 
 https://hugocool24.github.io/walkthrough/2017/11/19/snake-q-learn.html
 
-# Installation Dependencies:
+## Installation Dependencies:
 
 * Python 3.6
 * Keras
 * pygame
 * scikit-image
 
-# How to Run?
+## How to Run?
 
 
 ```
@@ -22,6 +22,6 @@ cd Snake-qlearn
 python qlearn.py -m "Run"
 ```
 
-# How to train?
+## How to train?
 
 python qlearn.py -m "Train"
