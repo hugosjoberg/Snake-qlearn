@@ -90,6 +90,7 @@ def train_network(model):
     t = 0
     exp_replay = experience_replay(BATCH)
     exp_replay.__next__()  # Start experience replay coroutine
+    epsilon = epsilon * EPSILON_DECAY if epsilon > FINAL_EPSILON else FINAL_EPSILON
     while True:
         loss = 0
         Q_sa = 0
@@ -101,14 +102,9 @@ def train_network(model):
         if t % NB_FRAMES == 0:
             if random.random() <= epsilon:
                 action_index = random.randrange(NB_ACTIONS)
-                a_t = GAME_INPUT[action_index]
             else:
                 action_index = np.argmax(model.predict(s_t))
-                a_t = GAME_INPUT[action_index]
-        if epsilon > FINAL_EPSILON:
-            epsilon = epsilon * EPSILON_DECAY
-        else:
-            epsilon = FINAL_EPSILON
+            a_t = GAME_INPUT[action_index]
         # run the selected action and observed next state and reward
         x_t1_colored, r_t, terminal = game_state.run(a_t)
         s_t1 = stack_image(x_t1_colored)
