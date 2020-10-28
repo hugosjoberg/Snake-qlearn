@@ -53,20 +53,13 @@ class Game(object):
     def distance(self, x1, x2, y1, y2):
         x = math.pow((x1 - x2), 2)
         y = math.pow((y1 - y2), 2)
-        distance = math.sqrt(x + y)
-        return distance
+        return math.sqrt(x + y)
 
     def collide(self, x1, x2, y1, y2, w1, w2, h1, h2):
-        if x1 + w1 > x2 and x1 < x2 + w2 and y1 + h1 > y2 and y1 < y2 + h2:
-            return True
-        else:
-            return False
+        return x1 + w1 > x2 and x1 < x2 + w2 and y1 + h1 > y2 and y1 < y2 + h2
 
     def reward(self, apple_eaten):
-        if self.new_distance < self.old_distance:
-            reward = 0.4
-        else:
-            reward = -0.4
+        reward = 0.4 if self.new_distance < self.old_distance else -0.4
         if apple_eaten:
             reward = 1.0
         return reward
@@ -103,7 +96,7 @@ class Game(object):
 
     def draw_board(self):
         self.s.fill((255, 255, 255))
-        for i in range(0, len(self.xs)):
+        for i in range(len(self.xs)):
             self.s.blit(self.img, (self.xs[i], self.ys[i]))
         self.s.blit(self.appleimage, self.applepos)
         pygame.draw.rect(self.s, (0, 0, 0), [0, 0, self.width, self.border_width])
