@@ -1,4 +1,4 @@
-# Snake-qlearn
+## Snake-qlearn
 
 A implementation of the classic snake game and a neural networking using the q-learning algorithm to solve the game.
 
